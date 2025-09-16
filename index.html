@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>课程时间查询 - SheetDB版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-6 max-w-6xl">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">课程时间查询</h1>
+            <p class="text-gray-600">基于Google表格 · 多人共享</p>
+            <div id="connectionStatus" class="mt-2 text-sm py-1 px-3 rounded-full inline-block bg-yellow-100 text-yellow-800">
+                <i class="fa fa-circle-o-notch fa-spin mr-1"></i> 连接中...
+            </div>
+        </header>
+        
+        <!-- 主内容区 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- 左侧：时间选择器 -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow-md p-5">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <i class="fa fa-calendar mr-2 text-blue-500"></i> 时间选择
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label for="selectedDate" class="block text-gray-700 mb-1">选择日期</label>
+                            <input type="date" id="selectedDate" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label for="selectedTime" class="block text-gray-700 mb-1">选择时间</label>
+                            <input type="time" id="selectedTime" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <button id="useCurrentTime" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-md transition-colors flex items-center justify-center">
+                            <i class="fa fa-clock-o mr-2"></i> 使用当前时间
+                        </button>
+                    </div>
+                    
+                    <div class="mt-6 pt-4 border-t border-gray-100">
+                        <h3 class="text-lg font-medium text-gray-700 mb-3">今日课程概览</h3>
+                        <div id="todayOverview" class="space-y-2 max-h-60 overflow-y-auto">
+                            <p class="text-gray-500 italic text-sm">选择日期后显示</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 右侧：课程信息和导入 -->
+            <div class="lg:col-span-2">
+                <!-- 当前时间上课情况 -->
+                <div class="bg-white rounded-lg shadow-md p-5 mb-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <i class="fa fa-users mr-2 text-purple-500"></i> 
+                        <span id="currentViewTitle">当前时间上课情况</span>
+                    </h2>
+                    
+                    <div id="currentClassContainer" class="p-6 border-2 border-dashed border-gray-200 rounded-lg text-center">
+                        <i class="fa fa-calendar-check-o text-5xl text-gray-300 mb-3"></i>
+                        <p class="text-gray-500" id="currentClassInfo">请选择时间查看上课情况</p>
+                    </div>
+                </div>
+                
+                <!-- 导入课程信息 -->
+                <div class="bg-white rounded-lg shadow-md p-5">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <i class="fa fa-plus-circle mr-2 text-green-500"></i> 添加课程信息
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label for="studentName" class="block text-gray-700 mb-1">学生姓名</label>
+                            <input type="text" id="studentName" placeholder="输入学生姓名" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label for="classDay" class="block text-gray-700 mb-1">星期</label>
+                                <select id="classDay" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="1">周一</option>
+                                    <option value="2">周二</option>
+                                    <option value="3">周三</option>
+                                    <option value="4">周四</option>
+                                    <option value="5">周五</option>
+                                    <option value="6">周六</option>
+                                    <option value="0">周日</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label for="classStartTime" class="block text-gray-700 mb-1">开始时间</label>
+                                <input type="time" id="classStartTime" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            
+                            <div>
+                                <label for="classEndTime" class="block text-gray-700 mb-1">结束时间</label>
+                                <input type="time" id="classEndTime" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        
+                        <button id="addClass" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-6 rounded-md transition-colors flex items-center">
+                            <i class="fa fa-save mr-2"></i> 添加课程
+                        </button>
+                    </div>
+                    
+                    <!-- 已添加的课程 -->
+                    <div class="mt-8">
+                        <h3 class="text-lg font-medium text-gray-700 mb-3">已添加的课程</h3>
+                        <div id="classList" class="space-y-2 max-h-60 overflow-y-auto">
+                            <p class="text-gray-500 italic text-sm">加载中...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="mt-10 text-center text-gray-500 text-sm pb-6">
+            <p>基于Google表格和SheetDB构建 · 无需服务器</p>
+        </footer>
+    </div>
+
+    <script>
+        // 已填入你的SheetDB API地址
+        const SHEETDB_API_URL = 'https://sheetdb.io/api/v1/bxiin2s1k7rlv';
+        
+        // DOM元素
+        const selectedDate = document.getElementById('selectedDate');
+        const selectedTime = document.getElementById('selectedTime');
+        const useCurrentTime = document.getElementById('useCurrentTime');
+        const currentViewTitle = document.getElementById('currentViewTitle');
+        const currentClassContainer = document.getElementById('currentClassContainer');
+        const todayOverview = document.getElementById('todayOverview');
+        const studentName = document.getElementById('studentName');
+        const classDay = document.getElementById('classDay');
+        const classStartTime = document.getElementById('classStartTime');
+        const classEndTime = document.getElementById('classEndTime');
+        const addClassBtn = document.getElementById('addClass');
+        const classList = document.getElementById('classList');
+        const connectionStatus = document.getElementById('connectionStatus');
+        
+        // 初始化日期和时间为当前时间
+        const now = new Date();
+        selectedDate.value = now.toISOString().split('T')[0];
+        selectedTime.value = now.toTimeString().split(' ')[0].slice(0, 5);
+        updateViewTitle();
+        
+        // 事件监听
+        useCurrentTime.addEventListener('click', () => {
+            const now = new Date();
+            selectedDate.value = now.toISOString().split('T')[0];
+            selectedTime.value = now.toTimeString().split(' ')[0].slice(0, 5);
+            updateViewTitle();
+            checkCurrentClasses();
+            updateTodayOverview();
+        });
+        
+        selectedDate.addEventListener('change', () => {
+            updateViewTitle();
+            checkCurrentClasses();
+            updateTodayOverview();
+        });
+        
+        selectedTime.addEventListener('change', () => {
+            updateViewTitle();
+            checkCurrentClasses();
+        });
+        
+        addClassBtn.addEventListener('click', addNewClass);
+        
+        // 页面加载时初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            // 检查SheetDB连接
+            checkSheetDBConnection();
+            
+            // 定时刷新数据（每30秒）
+            setInterval(() => {
+                fetchClasses();
+                checkCurrentClasses();
+                updateTodayOverview();
+            }, 30000);
+        });
+        
+        // 检查SheetDB连接状态
+        async function checkSheetDBConnection() {
+            try {
+                const response = await fetch(SHEETDB_API_URL);
+                if (response.ok) {
+                    connectionStatus.innerHTML = '<i class="fa fa-check mr-1"></i> 已连接';
+                    connectionStatus.className = 'mt-2 text-sm py-1 px-3 rounded-full inline-block bg-green-100 text-green-800';
+                    
+                    // 加载课程数据
+                    fetchClasses();
+                    checkCurrentClasses();
+                    updateTodayOverview();
+                } else {
+                    throw new Error('连接失败');
+                }
+            } catch (error) {
+                connectionStatus.innerHTML = '<i class="fa fa-exclamation-triangle mr-1"></i> 连接失败';
+                connectionStatus.className = 'mt-2 text-sm py-1 px-3 rounded-full inline-block bg-red-100 text-red-800';
+                console.error('SheetDB连接失败:', error);
+                alert('无法连接到SheetDB，请检查API地址是否正确');
+            }
+        }
+        
+        // 加载所有课程
+        async function fetchClasses() {
+            try {
+                const response = await fetch(SHEETDB_API_URL);
+                const classes = await response.json();
+                
+                if (Array.isArray(classes) && classes.length > 0) {
+                    displayClassList(classes);
+                } else {
+                    classList.innerHTML = '<p class="text-gray-500 italic text-sm">暂无课程数据</p>';
+                }
+            } catch (error) {
+                console.error('加载课程失败:', error);
+                classList.innerHTML = '<p class="text-red-500 italic text-sm">加载课程失败</p>';
+            }
+        }
+        
+        // 更新视图标题
+        function updateViewTitle() {
+            const date = new Date(selectedDate.value);
+            const dateStr = date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
+            currentViewTitle.textContent = `${dateStr} ${selectedTime.value} 上课情况`;
+        }
+        
+        // 检查当前时间谁在上课
+        async function checkCurrentClasses() {
+            try {
+                const targetDate = new Date(selectedDate.value);
+                const targetDay = targetDate.getDay(); // 0-6, 0是周日
+                const targetTime = selectedTime.value;
+                
+                // 获取所有课程
+                const response = await fetch(SHEETDB_API_URL);
+                const classes = await response.json();
+                
+                if (Array.isArray(classes) && classes.length > 0) {
+                    // 筛选符合条件的课程
+                    const currentClasses = classes.filter(classItem => {
+                        return parseInt(classItem.day) === targetDay && 
+                               isTimeBetween(targetTime, classItem.start_time, classItem.end_time);
+                    });
+                    
+                    // 显示结果
+                    if (currentClasses.length > 0) {
+                        let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
+                        currentClasses.forEach(classItem => {
+                            html += `
+                                <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                    <div class="font-medium text-gray-800">${classItem.student_name}</div>
+                                    <div class="text-xs text-gray-500 mt-2">时间: ${classItem.start_time} - ${classItem.end_time}</div>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                        currentClassContainer.innerHTML = html;
+                    } else {
+                        currentClassContainer.innerHTML = `
+                            <i class="fa fa-check-circle text-5xl text-green-300 mb-3"></i>
+                            <p class="text-gray-500">该时间没有人上课</p>
+                        `;
+                    }
+                } else {
+                    currentClassContainer.innerHTML = `
+                        <i class="fa fa-info-circle text-5xl text-blue-300 mb-3"></i>
+                        <p class="text-gray-500">暂无课程数据</p>
+                    `;
+                }
+            } catch (error) {
+                console.error('查询课程失败:', error);
+                currentClassContainer.innerHTML = '<p class="text-red-500">查询失败，请重试</p>';
+            }
+        }
+        
+        // 更新今日课程概览
+        async function updateTodayOverview() {
+            try {
+                const targetDate = new Date(selectedDate.value);
+                const targetDay = targetDate.getDay();
+                
+                const response = await fetch(SHEETDB_API_URL);
+                const classes = await response.json();
+                
+                if (Array.isArray(classes) && classes.length > 0) {
+                    // 筛选当天课程
+                    const dayClasses = classes.filter(classItem => parseInt(classItem.day) === targetDay);
+                    
+                    // 按时间排序
+                    dayClasses.sort((a, b) => a.start_time.localeCompare(b.start_time));
+                    
+                    if (dayClasses.length > 0) {
+                        let html = '';
+                        dayClasses.forEach(classItem => {
+                            html += `
+                                <div class="flex items-center p-2 border-b border-gray-100 last:border-0">
+                                    <div class="w-24 text-sm text-gray-600">${classItem.start_time}</div>
+                                    <div class="flex-1 text-sm font-medium">${classItem.student_name}</div>
+                                </div>
+                            `;
+                        });
+                        todayOverview.innerHTML = html;
+                    } else {
+                        todayOverview.innerHTML = '<p class="text-gray-500 italic text-sm">当天没有课程安排</p>';
+                    }
+                } else {
+                    todayOverview.innerHTML = '<p class="text-gray-500 italic text-sm">暂无课程数据</p>';
+                }
+            } catch (error) {
+                console.error('加载课程概览失败:', error);
+                todayOverview.innerHTML = '<p class="text-red-500 italic text-sm">加载失败</p>';
+            }
+        }
+        
+        // 显示课程列表
+        function displayClassList(classes) {
+            const dayMap = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+            let html = '';
+            
+            // 按星期和时间排序
+            const sortedClasses = [...classes].sort((a, b) => {
+                if (parseInt(a.day)!== parseInt(b.day)) {
+                    return parseInt(a.day) - parseInt(b.day);
+                }
+                return a.start_time.localeCompare(b.start_time);
+            });
+            
+            sortedClasses.forEach(classItem => {
+                html += `
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-md border border-gray-100">
+                        <div class="flex-1">
+                            <div class="font-medium">${classItem.student_name}</div>
+                            <div class="text-sm text-gray-600">
+                                ${dayMap[parseInt(classItem.day)]} ${classItem.start_time} - ${classItem.end_time}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            classList.innerHTML = html;
+        }
+        
+        // 添加新课程
+        async function addNewClass() {
+            // 验证输入
+            if (!studentName.value.trim()) {
+                alert('请输入学生姓名');
+                return;
+            }
+            
+            if (!classStartTime.value ||!classEndTime.value) {
+                alert('请选择课程开始和结束时间');
+                return;
+            }
+            
+            if (classStartTime.value >= classEndTime.value) {
+                alert('结束时间必须晚于开始时间');
+                return;
+            }
+            
+            // 创建课程对象（字段名必须与Google表格列名完全一致）
+            const newClass = {
+                student_name: studentName.value.trim(),
+                day: classDay.value,
+                start_time: classStartTime.value,
+                end_time: classEndTime.value
+            };
+            
+            try {
+                // 发送数据到SheetDB
+                const response = await fetch(SHEETDB_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ data: newClass })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.created === 1) {
+                    // 清空表单
+                    studentName.value = '';
+                    // 刷新课程列表
+                    fetchClasses();
+                    checkCurrentClasses();
+                    updateTodayOverview();
+                    alert('课程添加成功');
+                } else {
+                    throw new Error(result.message || '添加失败，请检查SheetDB配置');
+                }
+            } catch (error) {
+                console.error('添加课程失败:', error);
+                alert(`添加课程失败: ${error.message}`);
+            }
+        }
+        
+        // 辅助函数：检查时间是否在范围内
+        function isTimeBetween(time, startTime, endTime) {
+            return time >= startTime && time <= endTime;
+        }
+    </script>
+</body>
+</html>
+    
