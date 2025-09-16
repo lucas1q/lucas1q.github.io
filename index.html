@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>课程时间查询 - SheetDB版</title>
+    <title>课程时间查询 - 自动OCR版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
 </head>
@@ -11,11 +11,70 @@
     <div class="container mx-auto px-4 py-6 max-w-6xl">
         <header class="mb-8 text-center">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">课程时间查询</h1>
-            <p class="text-gray-600">基于Google表格 · 多人共享</p>
+            <p class="text-gray-600">Roboflow OCR识别 · 多人共享</p>
             <div id="connectionStatus" class="mt-2 text-sm py-1 px-3 rounded-full inline-block bg-yellow-100 text-yellow-800">
                 <i class="fa fa-circle-o-notch fa-spin mr-1"></i> 连接中...
             </div>
         </header>
+        
+        <!-- Roboflow OCR文件导入区域 -->
+        <div class="bg-blue-50 rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                <i class="fa fa-file-text-o mr-2 text-purple-500"></i> 自动OCR识别导入
+            </h2>
+            
+            <div class="border-2 border-dashed border-blue-200 rounded-lg p-8 text-center">
+                <i class="fa fa-picture-o text-5xl text-blue-300 mb-4"></i>
+                <p class="text-gray-600 mb-4">上传课程表图片，系统将自动提取课程信息</p>
+                
+                <div class="flex flex-col md:flex-row gap-4 justify-center">
+                    <label for="fileUpload" class="bg-blue-500 hover:bg-blue-600 text-white py-3 px-6 rounded-md transition-colors flex items-center justify-center cursor-pointer">
+                        <i class="fa fa-upload mr-2"></i> 选择图片
+                        <input type="file" id="fileUpload" accept=".jpg,.jpeg,.png" class="hidden">
+                    </label>
+                    
+                    <button id="startRecognition" class="bg-purple-500 hover:bg-purple-600 text-white py-3 px-6 rounded-md transition-colors flex items-center justify-center" disabled>
+                        <i class="fa fa-cog mr-2"></i> 开始识别
+                    </button>
+                </div>
+                
+                <p class="text-xs text-gray-500 mt-4">支持格式：JPG、PNG（建议图片清晰，文字水平）</p>
+            </div>
+            
+            <!-- 识别进度 -->
+            <div id="recognitionProgress" class="mt-6 hidden">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm text-gray-600">识别中...</span>
+                    <span id="progressPercent" class="text-sm text-gray-600">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="progressBar" class="bg-purple-500 h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <!-- OCR识别结果 -->
+            <div id="ocrResult" class="mt-6 hidden">
+                <h3 class="text-lg font-medium text-gray-700 mb-3">识别的文本内容（可编辑）</h3>
+                <textarea id="recognizedText" class="w-full border border-gray-300 rounded-md p-3 h-32 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="识别的文本将显示在这里..."></textarea>
+                
+                <button id="parseText" class="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-md transition-colors flex items-center">
+                    <i class="fa fa-magic mr-2"></i> 解析课程信息
+                </button>
+            </div>
+            
+            <!-- 解析结果预览 -->
+            <div id="parsedCoursesContainer" class="mt-6 hidden">
+                <h3 class="text-lg font-medium text-gray-700 mb-3">解析的课程信息（可编辑）</h3>
+                <div id="parsedCourses" class="space-y-4 p-4 bg-white rounded-lg border border-gray-200 max-h-60 overflow-y-auto">
+                    <!-- 解析出的课程会在这里显示 -->
+                </div>
+                <div class="mt-4 flex justify-end">
+                    <button id="saveParsedCourses" class="bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-md transition-colors flex items-center">
+                        <i class="fa fa-save mr-2"></i> 保存所有课程
+                    </button>
+                </div>
+            </div>
+        </div>
         
         <!-- 主内容区 -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -66,10 +125,10 @@
                     </div>
                 </div>
                 
-                <!-- 导入课程信息 -->
+                <!-- 手动添加课程信息 -->
                 <div class="bg-white rounded-lg shadow-md p-5">
                     <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                        <i class="fa fa-plus-circle mr-2 text-green-500"></i> 添加课程信息
+                        <i class="fa fa-plus-circle mr-2 text-green-500"></i> 手动添加课程
                     </h2>
                     
                     <div class="space-y-4">
@@ -120,15 +179,28 @@
         </div>
         
         <footer class="mt-10 text-center text-gray-500 text-sm pb-6">
-            <p>基于Google表格和SheetDB构建 · 无需服务器</p>
+            <p>基于SheetDB和Roboflow OCR构建 · 免费识别课程信息</p>
         </footer>
     </div>
 
     <script>
-        // 已填入你的SheetDB API地址
-        const SHEETDB_API_URL = 'https://sheetdb.io/api/v1/bxiin2s1k7rlv';
+        // 填入你的SheetDB API地址
+        const SHEETDB_API_URL = 'https://sheetdb.io/api/v1/bxiin2slk7riv';
+        // 内置Roboflow API密钥
+        const ROBOFLOW_API_KEY = 'O8UFqh0WwmON6pvbKPMs';
         
         // DOM元素
+        const fileUpload = document.getElementById('fileUpload');
+        const startRecognition = document.getElementById('startRecognition');
+        const recognitionProgress = document.getElementById('recognitionProgress');
+        const progressBar = document.getElementById('progressBar');
+        const progressPercent = document.getElementById('progressPercent');
+        const ocrResult = document.getElementById('ocrResult');
+        const recognizedText = document.getElementById('recognizedText');
+        const parseText = document.getElementById('parseText');
+        const parsedCoursesContainer = document.getElementById('parsedCoursesContainer');
+        const parsedCourses = document.getElementById('parsedCourses');
+        const saveParsedCourses = document.getElementById('saveParsedCourses');
         const selectedDate = document.getElementById('selectedDate');
         const selectedTime = document.getElementById('selectedTime');
         const useCurrentTime = document.getElementById('useCurrentTime');
@@ -149,7 +221,102 @@
         selectedTime.value = now.toTimeString().split(' ')[0].slice(0, 5);
         updateViewTitle();
         
-        // 事件监听
+        // 文件上传事件
+        fileUpload.addEventListener('change', (e) => {
+            startRecognition.disabled = e.target.files.length === 0;
+            if (e.target.files.length > 0) {
+                alert(`已选择文件: ${e.target.files[0].name}`);
+            }
+        });
+        
+        // 开始识别按钮事件
+        startRecognition.addEventListener('click', () => {
+            if (!fileUpload.files.length) return;
+            
+            const file = fileUpload.files[0];
+            // 简单验证文件大小（限制5MB以内）
+            if (file.size > 5 * 1024 * 1024) {
+                alert('文件过大，请选择5MB以内的图片');
+                return;
+            }
+            
+            // 显示进度条
+            recognitionProgress.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            progressPercent.textContent = '0%';
+            
+            // 调用Roboflow OCR API
+            callRoboflowOcrApi(file);
+        });
+        
+        // 解析文本按钮事件
+        parseText.addEventListener('click', () => {
+            if (!recognizedText.value.trim()) {
+                alert('没有可解析的文本内容');
+                return;
+            }
+            
+            // 解析识别到的文本，提取课程信息
+            const courses = parseCourseText(recognizedText.value);
+            displayParsedCourses(courses);
+            parsedCoursesContainer.classList.remove('hidden');
+        });
+        
+        // 保存识别结果按钮事件
+        saveParsedCourses.addEventListener('click', async () => {
+            const courseElements = parsedCourses.querySelectorAll('.course-item');
+            const coursesToSave = [];
+            
+            courseElements.forEach(el => {
+                const student = el.querySelector('.student-name').value.trim();
+                const day = el.querySelector('.course-day').value;
+                const start = el.querySelector('.course-start').value;
+                const end = el.querySelector('.course-end').value;
+                
+                if (student && day && start && end && start < end) {
+                    coursesToSave.push({
+                        student_name: student,
+                        day: day,
+                        start_time: start,
+                        end_time: end
+                    });
+                }
+            });
+            
+            if (coursesToSave.length === 0) {
+                alert('请确认课程信息是否完整');
+                return;
+            }
+            
+            try {
+                // 批量保存课程
+                for (const course of coursesToSave) {
+                    await fetch(SHEETDB_API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ data: course })
+                    });
+                }
+                
+                // 刷新课程列表
+                fetchClasses();
+                checkCurrentClasses();
+                updateTodayOverview();
+                
+                // 重置识别区域
+                parsedCoursesContainer.classList.add('hidden');
+                ocrResult.classList.add('hidden');
+                fileUpload.value = '';
+                startRecognition.disabled = true;
+                
+                alert(`成功保存 ${coursesToSave.length} 条课程信息`);
+            } catch (error) {
+                console.error('保存课程失败:', error);
+                alert('保存课程失败，请重试');
+            }
+        });
+        
+        // 其他事件监听
         useCurrentTime.addEventListener('click', () => {
             const now = new Date();
             selectedDate.value = now.toISOString().split('T')[0];
@@ -174,7 +341,6 @@
         
         // 页面加载时初始化
         window.addEventListener('DOMContentLoaded', () => {
-            // 检查SheetDB连接
             checkSheetDBConnection();
             
             // 定时刷新数据（每30秒）
@@ -185,15 +351,216 @@
             }, 30000);
         });
         
-        // 检查SheetDB连接状态
+        // 调用Roboflow OCR API
+        async function callRoboflowOcrApi(file) {
+            try {
+                // 1. 将图片转为Base64
+                const base64Image = await fileToBase64(file);
+                
+                // 2. 显示进度
+                updateProgress(30);
+                
+                // 3. 调用Roboflow OCR API（使用内置密钥）
+                const response = await fetch('https://infer.roboflow.com/doctr/ocr', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Token ${ROBOFLOW_API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        // 只发送Base64数据部分（去掉data:image/...前缀）
+                        image: base64Image.split(',')[1]
+                    })
+                });
+                
+                updateProgress(70);
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || `API请求失败: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                // 4. 提取识别到的文本
+                let fullText = '';
+                if (result && result.pages && result.pages.length > 0) {
+                    result.pages[0].blocks.forEach(block => {
+                        block.lines.forEach(line => {
+                            line.words.forEach(word => {
+                                fullText += word.text +'';
+                            });
+                            fullText += '\n';
+                        });
+                    });
+                }
+                
+                updateProgress(100);
+                
+                // 5. 显示识别结果
+                recognizedText.value = fullText;
+                ocrResult.classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Roboflow OCR API调用失败:', error);
+                alert(`识别失败: ${error.message}`);
+                updateProgress(0);
+            }
+        }
+        
+        // 将文件转为Base64
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (e) => reject(e);
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        // 更新进度条
+        function updateProgress(percent) {
+            progressBar.style.width = `${percent}%`;
+            progressPercent.textContent = `${percent}%`;
+            
+            if (percent === 100) {
+                setTimeout(() => {
+                    recognitionProgress.classList.add('hidden');
+                }, 1000);
+            }
+        }
+        
+        // 解析文本中的课程信息
+        function parseCourseText(text) {
+            // 支持的星期关键词映射
+            const dayKeywords = {
+                '日': '0',
+                '天': '0',
+                '一': '1',
+                '二': '2',
+                '三': '3',
+                '四': '4',
+                '五': '5',
+                '六': '6',
+                '周日': '0',
+                '周一': '1',
+                '周二': '2',
+                '周三': '3',
+                '周四': '4',
+                '周五': '5',
+                '周六': '6'
+            };
+            
+            // 分割文本为行
+            const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+            const courses = [];
+            
+            // 简单的课程信息提取规则
+            lines.forEach(line => {
+                // 匹配包含时间格式(HH:MM或HH-MM)和星期的行
+                const timeRegex = /(\d{1,2}:\d{2})[^\d]*(\d{1,2}:\d{2})/;
+                const dayRegex = /(周[日一二三四五六天]|周日|周一|周二|周三|周四|周五|周六)/;
+                
+                const timeMatch = line.match(timeRegex);
+                const dayMatch = line.match(dayRegex);
+                
+                if (timeMatch && dayMatch) {
+                    // 提取开始和结束时间
+                    const [_, startTime, endTime] = timeMatch;
+                    
+                    // 提取星期
+                    const dayText = dayMatch[0];
+                    const day = dayKeywords[dayText] || '1'; // 默认周一
+                    
+                    // 提取学生姓名(去掉时间和星期后的剩余文本)
+                    let studentName = line.replace(timeRegex, '').replace(dayRegex, '').trim();
+                    // 清理可能的特殊字符
+                    studentName = studentName.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g,'').trim();
+                    
+                    if (studentName) {
+                        courses.push({
+                            student: studentName,
+                            day: day,
+                            start: startTime,
+                            end: endTime
+                        });
+                    }
+                }
+            });
+            
+            // 如果没有解析到课程，返回一个空模板
+            if (courses.length === 0) {
+                return [{
+                    student: '',
+                    day: '1',
+                    start: '09:00',
+                    end: '10:30'
+                }];
+            }
+            
+            return courses;
+        }
+        
+        // 显示解析出的课程
+        function displayParsedCourses(results) {
+            parsedCourses.innerHTML = '';
+            const dayMap = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+            
+            results.forEach((course, index) => {
+                const courseEl = document.createElement('div');
+                courseEl.className = 'course-item p-3 border border-gray-200 rounded-md';
+                courseEl.innerHTML = `
+                    <div class="flex flex-col md:flex-row gap-4">
+                        <div class="flex-1">
+                            <label class="block text-sm text-gray-600 mb-1">学生姓名</label>
+                            <input type="text" class="student-name w-full border border-gray-300 rounded px-2 py-1" value="${course.student}">
+                        </div>
+                        
+                        <div class="w-24">
+                            <label class="block text-sm text-gray-600 mb-1">星期</label>
+                            <select class="course-day w-full border border-gray-300 rounded px-2 py-1">
+                                ${[0,1,2,3,4,5,6].map(day => `
+                                    <option value="${day}" ${course.day == day? 'selected' : ''}>${dayMap[day]}</option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="w-24">
+                            <label class="block text-sm text-gray-600 mb-1">开始时间</label>
+                            <input type="time" class="course-start w-full border border-gray-300 rounded px-2 py-1" value="${course.start}">
+                        </div>
+                        
+                        <div class="w-24">
+                            <label class="block text-sm text-gray-600 mb-1">结束时间</label>
+                            <input type="time" class="course-end w-full border border-gray-300 rounded px-2 py-1" value="${course.end}">
+                        </div>
+                        
+                        <div class="flex items-end">
+                            <button class="remove-course text-red-500 hover:text-red-700 p-2" data-index="${index}">
+                                <i class="fa fa-trash-o"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                parsedCourses.appendChild(courseEl);
+            });
+            
+            // 添加删除单条课程的事件
+            document.querySelectorAll('.remove-course').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = e.currentTarget.getAttribute('data-index');
+                    parsedCourses.children[index].remove();
+                });
+            });
+        }
+        
+        // 以下是原有功能代码（与SheetDB交互部分）
         async function checkSheetDBConnection() {
             try {
                 const response = await fetch(SHEETDB_API_URL);
                 if (response.ok) {
                     connectionStatus.innerHTML = '<i class="fa fa-check mr-1"></i> 已连接';
                     connectionStatus.className = 'mt-2 text-sm py-1 px-3 rounded-full inline-block bg-green-100 text-green-800';
-                    
-                    // 加载课程数据
                     fetchClasses();
                     checkCurrentClasses();
                     updateTodayOverview();
@@ -204,11 +571,9 @@
                 connectionStatus.innerHTML = '<i class="fa fa-exclamation-triangle mr-1"></i> 连接失败';
                 connectionStatus.className = 'mt-2 text-sm py-1 px-3 rounded-full inline-block bg-red-100 text-red-800';
                 console.error('SheetDB连接失败:', error);
-                alert('无法连接到SheetDB，请检查API地址是否正确');
             }
         }
         
-        // 加载所有课程
         async function fetchClasses() {
             try {
                 const response = await fetch(SHEETDB_API_URL);
@@ -225,32 +590,27 @@
             }
         }
         
-        // 更新视图标题
         function updateViewTitle() {
             const date = new Date(selectedDate.value);
             const dateStr = date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
             currentViewTitle.textContent = `${dateStr} ${selectedTime.value} 上课情况`;
         }
         
-        // 检查当前时间谁在上课
         async function checkCurrentClasses() {
             try {
                 const targetDate = new Date(selectedDate.value);
-                const targetDay = targetDate.getDay(); // 0-6, 0是周日
+                const targetDay = targetDate.getDay();
                 const targetTime = selectedTime.value;
                 
-                // 获取所有课程
                 const response = await fetch(SHEETDB_API_URL);
                 const classes = await response.json();
                 
                 if (Array.isArray(classes) && classes.length > 0) {
-                    // 筛选符合条件的课程
                     const currentClasses = classes.filter(classItem => {
                         return parseInt(classItem.day) === targetDay && 
                                isTimeBetween(targetTime, classItem.start_time, classItem.end_time);
                     });
                     
-                    // 显示结果
                     if (currentClasses.length > 0) {
                         let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
                         currentClasses.forEach(classItem => {
@@ -281,7 +641,6 @@
             }
         }
         
-        // 更新今日课程概览
         async function updateTodayOverview() {
             try {
                 const targetDate = new Date(selectedDate.value);
@@ -291,10 +650,7 @@
                 const classes = await response.json();
                 
                 if (Array.isArray(classes) && classes.length > 0) {
-                    // 筛选当天课程
                     const dayClasses = classes.filter(classItem => parseInt(classItem.day) === targetDay);
-                    
-                    // 按时间排序
                     dayClasses.sort((a, b) => a.start_time.localeCompare(b.start_time));
                     
                     if (dayClasses.length > 0) {
@@ -320,12 +676,10 @@
             }
         }
         
-        // 显示课程列表
         function displayClassList(classes) {
             const dayMap = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
             let html = '';
             
-            // 按星期和时间排序
             const sortedClasses = [...classes].sort((a, b) => {
                 if (parseInt(a.day)!== parseInt(b.day)) {
                     return parseInt(a.day) - parseInt(b.day);
@@ -349,9 +703,7 @@
             classList.innerHTML = html;
         }
         
-        // 添加新课程
         async function addNewClass() {
-            // 验证输入
             if (!studentName.value.trim()) {
                 alert('请输入学生姓名');
                 return;
@@ -367,7 +719,6 @@
                 return;
             }
             
-            // 创建课程对象（字段名必须与Google表格列名完全一致）
             const newClass = {
                 student_name: studentName.value.trim(),
                 day: classDay.value,
@@ -376,27 +727,22 @@
             };
             
             try {
-                // 发送数据到SheetDB
                 const response = await fetch(SHEETDB_API_URL, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ data: newClass })
                 });
                 
                 const result = await response.json();
                 
                 if (response.ok && result.created === 1) {
-                    // 清空表单
                     studentName.value = '';
-                    // 刷新课程列表
                     fetchClasses();
                     checkCurrentClasses();
                     updateTodayOverview();
                     alert('课程添加成功');
                 } else {
-                    throw new Error(result.message || '添加失败，请检查SheetDB配置');
+                    throw new Error(result.message || '添加失败');
                 }
             } catch (error) {
                 console.error('添加课程失败:', error);
@@ -404,7 +750,6 @@
             }
         }
         
-        // 辅助函数：检查时间是否在范围内
         function isTimeBetween(time, startTime, endTime) {
             return time >= startTime && time <= endTime;
         }
