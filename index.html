@@ -3,57 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>课程时间查询 - 支持PDF/DOCX版</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
-    <!-- PDF处理库 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
-    <!-- DOCX处理库 -->
-    <script src="https://unpkg.com/docxtemplater@3.37.12/build/docxtemplater.js"></script>
-    <script src="https://unpkg.com/pizzip@3.1.4/dist/pizzip.js"></script>
-    <script src="https://unpkg.com/pizzip@3.1.4/dist/pizzip-utils.js"></script>
+    <title>课程时间查询 - 本地安全版</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta name="referrer" content="no-referrer">
+    <link rel="stylesheet" href="styles.css">
+    <script src="vendor/jszip-3.10.2.min.js" defer></script>
+    <script src="app.js" defer></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <div class="container mx-auto px-4 py-6 max-w-6xl">
         <header class="mb-8 text-center">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">课程时间查询</h1>
-            <p class="text-gray-600">Roboflow OCR识别 · 支持PDF/DOCX · 多人共享</p>
+            <p class="text-gray-600">本地课程管理 · DOCX / 文本导入 · JSON备份</p>
             <div id="connectionStatus" class="mt-2 text-sm py-1 px-3 rounded-full inline-block bg-yellow-100 text-yellow-800">
-                <i class="fa fa-circle-o-notch fa-spin mr-1"></i> 连接中...
+                本地模式
             </div>
         </header>
         
-        <!-- 文件导入与OCR识别区域 -->
+        <div id="securityNotice" class="notice" role="note">
+            云端OCR和多人共享已暂停：尚未配置带身份验证的安全后端。PDF/图片识别暂不可用，请粘贴文本或导入DOCX。
+            课程仅保存在当前浏览器，不会读取旧云端数据，也不会自动同步。请定期导出备份；共用设备上的其他人可能看到本地课程。
+        </div>
+        <div id="appMessage" class="notice hidden" role="status" aria-live="polite"></div>
+        <!-- 本地文件导入区域 -->
         <div class="bg-blue-50 rounded-lg p-6 mb-6 shadow-sm">
             <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                <i class="fa fa-file-text-o mr-2 text-purple-500"></i> 自动OCR识别导入
+                本地文件导入
             </h2>
             
             <div class="border-2 border-dashed border-blue-200 rounded-lg p-8 text-center">
-                <i class="fa fa-file-pdf-o text-5xl text-blue-300 mb-4"></i>
-                <p class="text-gray-600 mb-4">上传课程表文件（PDF/DOCX/图片），系统将自动提取课程信息</p>
+                <p class="text-gray-600 mb-4">选择DOCX、UTF-8文本或JSON备份，文件在浏览器内处理</p>
                 
                 <div class="flex flex-col md:flex-row gap-4 justify-center">
                     <label for="fileUpload" class="bg-blue-500 hover:bg-blue-600 text-white py-3 px-6 rounded-md transition-colors flex items-center justify-center cursor-pointer shadow-md hover:shadow-lg">
-                        <i class="fa fa-upload mr-2"></i> 选择文件
-                        <input type="file" id="fileUpload" accept=".pdf,.docx,.jpg,.jpeg,.png" class="hidden">
+                        选择文件
+                        <input type="file" id="fileUpload" accept=".docx,.txt,.json" class="hidden">
                     </label>
                     
                     <button id="startRecognition" class="bg-purple-500 hover:bg-purple-600 text-white py-3 px-6 rounded-md transition-colors flex items-center justify-center shadow-md hover:shadow-lg" disabled>
-                        <i class="fa fa-cog mr-2"></i> 开始识别
+                        读取文件
                     </button>
                 </div>
                 
                 <!-- 文件信息预览 -->
                 <div id="fileInfo" class="mt-4 p-3 bg-white rounded border border-gray-200 hidden">
                     <p class="text-sm text-gray-700 flex items-center">
-                        <i class="fa fa-file-text-o mr-2 text-blue-500"></i>
                         <span id="fileName">未选择文件</span>
                         <span id="fileSize" class="ml-2 text-gray-500"></span>
                     </p>
                 </div>
                 
-                <p class="text-xs text-gray-500 mt-4">支持格式：PDF、DOCX、JPG、PNG（建议文件清晰，文字水平）</p>
+                <p class="text-xs text-gray-500 mt-4">支持DOCX、TXT、JSON，文件上限10MB。PDF/图片云端识别暂不可用</p>
             </div>
             
             <!-- 识别进度 -->
@@ -63,30 +63,17 @@
                     <span id="progressPercent" class="text-sm text-gray-600">0%</span>
                 </div>
                 <div class="w-full bg-gray-200 rounded-full h-2.5">
-                    <div id="progressBar" class="bg-purple-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    <div id="progressBar" class="bg-purple-500 h-2.5 rounded-full transition-all duration-300"></div>
                 </div>
             </div>
             
-            <!-- 多页文件选择（PDF专用） -->
-            <div id="pdfPageSelector" class="mt-6 hidden">
-                <h3 class="text-lg font-medium text-gray-700 mb-3">选择PDF页面</h3>
-                <div class="flex flex-wrap gap-2">
-                    <select id="pageSelect" class="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <!-- 动态生成页码选项 -->
-                    </select>
-                    <button id="confirmPageBtn" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md text-sm transition-colors">
-                        确认选择
-                    </button>
-                </div>
-            </div>
-            
-            <!-- OCR识别结果 -->
-            <div id="ocrResult" class="mt-6 hidden">
-                <h3 class="text-lg font-medium text-gray-700 mb-3">识别的文本内容（可编辑）</h3>
-                <textarea id="recognizedText" class="w-full border border-gray-300 rounded-md p-3 h-32 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="识别的文本将显示在这里..."></textarea>
+            <!-- 可直接粘贴文本 -->
+            <div id="ocrResult" class="mt-6">
+                <h3 class="text-lg font-medium text-gray-700 mb-3">课程文本（可粘贴、可编辑）</h3>
+                <textarea aria-label="课程文本" id="recognizedText" class="w-full border border-gray-300 rounded-md p-3 h-32 focus:outline-none focus:ring-2 focus:ring-blue-500" maxlength="100000" placeholder="例如：张三 周一 09:00-10:30"></textarea>
                 
                 <button id="parseText" class="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-md transition-colors flex items-center shadow hover:shadow-md">
-                    <i class="fa fa-magic mr-2"></i> 解析课程信息
+                    解析课程信息
                 </button>
             </div>
             
@@ -98,7 +85,7 @@
                 </div>
                 <div class="mt-4 flex justify-end">
                     <button id="saveParsedCourses" class="bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-md transition-colors flex items-center shadow hover:shadow-md">
-                        <i class="fa fa-save mr-2"></i> 保存所有课程
+                        保存到当前浏览器
                     </button>
                 </div>
             </div>
@@ -110,7 +97,7 @@
             <div class="lg:col-span-1">
                 <div class="bg-white rounded-lg shadow-md p-5">
                     <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                        <i class="fa fa-calendar mr-2 text-blue-500"></i> 时间选择
+                        时间选择
                     </h2>
                     
                     <div class="space-y-4">
@@ -125,7 +112,7 @@
                         </div>
                         
                         <button id="useCurrentTime" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-md transition-colors flex items-center justify-center shadow hover:shadow-md">
-                            <i class="fa fa-clock-o mr-2"></i> 使用当前时间
+                            使用当前时间
                         </button>
                     </div>
                     
@@ -143,12 +130,10 @@
                 <!-- 当前时间上课情况 -->
                 <div class="bg-white rounded-lg shadow-md p-5 mb-6">
                     <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                        <i class="fa fa-users mr-2 text-purple-500"></i> 
                         <span id="currentViewTitle">当前时间上课情况</span>
                     </h2>
                     
                     <div id="currentClassContainer" class="p-6 border-2 border-dashed border-gray-200 rounded-lg text-center">
-                        <i class="fa fa-calendar-check-o text-5xl text-gray-300 mb-3"></i>
                         <p class="text-gray-500" id="currentClassInfo">请选择时间查看上课情况</p>
                     </div>
                 </div>
@@ -156,13 +141,13 @@
                 <!-- 手动添加课程信息 -->
                 <div class="bg-white rounded-lg shadow-md p-5">
                     <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                        <i class="fa fa-plus-circle mr-2 text-green-500"></i> 手动添加课程
+                        手动添加课程
                     </h2>
                     
                     <div class="space-y-4">
                         <div>
                             <label for="studentName" class="block text-gray-700 mb-1">学生姓名</label>
-                            <input type="text" id="studentName" placeholder="输入学生姓名" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <input type="text" id="studentName" maxlength="120" placeholder="输入学生姓名" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -191,13 +176,16 @@
                         </div>
                         
                         <button id="addClass" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-6 rounded-md transition-colors flex items-center shadow hover:shadow-md">
-                            <i class="fa fa-save mr-2"></i> 添加课程
+                            添加课程
                         </button>
                     </div>
                     
                     <!-- 已添加的课程 -->
                     <div class="mt-8">
-                        <h3 class="text-lg font-medium text-gray-700 mb-3">已添加的课程</h3>
+                        <div class="flex items-center justify-between gap-4 mb-3">
+                            <h3 class="text-lg font-medium text-gray-700">已保存的本地课程</h3>
+                            <button id="exportCourses" class="bg-green-500 text-white py-2 px-4 rounded-md">导出JSON备份</button>
+                        </div>
                         <div id="classList" class="space-y-2 max-h-60 overflow-y-auto">
                             <p class="text-gray-500 italic text-sm">加载中...</p>
                         </div>
@@ -207,815 +195,9 @@
         </div>
         
         <footer class="mt-10 text-center text-gray-500 text-sm pb-6">
-            <p>基于SheetDB和Roboflow OCR构建 · 支持PDF/DOCX识别</p>
+            <p>本地安全模式 · 清除网站数据会删除本地课程，请先导出备份</p>
         </footer>
     </div>
 
-    <script>
-        // 配置信息
-        const SHEETDB_API_URL = 'https://sheetdb.io/api/v1/bxiin2slk7riv';
-        const ROBOFLOW_API_KEY = 'O8UFqh0WwmON6pvbKPMs';
-        
-        // 全局变量
-        let selectedFile = null;
-        let pdfDoc = null;
-        let currentPage = 1;
-        
-        // DOM元素
-        const fileUpload = document.getElementById('fileUpload');
-        const startRecognition = document.getElementById('startRecognition');
-        const fileInfo = document.getElementById('fileInfo');
-        const fileName = document.getElementById('fileName');
-        const fileSize = document.getElementById('fileSize');
-        const recognitionProgress = document.getElementById('recognitionProgress');
-        const progressBar = document.getElementById('progressBar');
-        const progressPercent = document.getElementById('progressPercent');
-        const progressText = document.getElementById('progressText');
-        const pdfPageSelector = document.getElementById('pdfPageSelector');
-        const pageSelect = document.getElementById('pageSelect');
-        const confirmPageBtn = document.getElementById('confirmPageBtn');
-        const ocrResult = document.getElementById('ocrResult');
-        const recognizedText = document.getElementById('recognizedText');
-        const parseText = document.getElementById('parseText');
-        const parsedCoursesContainer = document.getElementById('parsedCoursesContainer');
-        const parsedCourses = document.getElementById('parsedCourses');
-        const saveParsedCourses = document.getElementById('saveParsedCourses');
-        const selectedDate = document.getElementById('selectedDate');
-        const selectedTime = document.getElementById('selectedTime');
-        const useCurrentTime = document.getElementById('useCurrentTime');
-        const currentViewTitle = document.getElementById('currentViewTitle');
-        const currentClassContainer = document.getElementById('currentClassContainer');
-        const todayOverview = document.getElementById('todayOverview');
-        const studentName = document.getElementById('studentName');
-        const classDay = document.getElementById('classDay');
-        const classStartTime = document.getElementById('classStartTime');
-        const classEndTime = document.getElementById('classEndTime');
-        const addClassBtn = document.getElementById('addClass');
-        const classList = document.getElementById('classList');
-        const connectionStatus = document.getElementById('connectionStatus');
-        
-        // 初始化
-        const now = new Date();
-        selectedDate.value = now.toISOString().split('T')[0];
-        selectedTime.value = now.toTimeString().split(' ')[0].slice(0, 5);
-        updateViewTitle();
-        
-        // 事件监听
-        fileUpload.addEventListener('change', handleFileSelection);
-        startRecognition.addEventListener('click', startFileProcessing);
-        confirmPageBtn.addEventListener('click', confirmPdfPageSelection);
-        parseText.addEventListener('click', parseRecognizedText);
-        saveParsedCourses.addEventListener('click', saveParsedCoursesToDB);
-        useCurrentTime.addEventListener('click', useCurrentDateTime);
-        selectedDate.addEventListener('change', updateViewAndData);
-        selectedTime.addEventListener('change', updateViewAndData);
-        addClassBtn.addEventListener('click', addNewClassManually);
-        
-        // 页面加载完成后初始化
-        window.addEventListener('DOMContentLoaded', () => {
-            checkSheetDBConnection();
-            
-            // 定时刷新数据
-            setInterval(() => {
-                fetchClasses();
-                checkCurrentClasses();
-                updateTodayOverview();
-            }, 30000);
-        });
-        
-        // 文件选择处理
-        function handleFileSelection(e) {
-            if (e.target.files.length > 0) {
-                selectedFile = e.target.files[0];
-                startRecognition.disabled = false;
-                
-                // 显示文件信息
-                fileInfo.classList.remove('hidden');
-                fileName.textContent = selectedFile.name;
-                fileSize.textContent = formatFileSize(selectedFile.size);
-                
-                // 重置之前的状态
-                resetRecognitionState();
-            } else {
-                startRecognition.disabled = true;
-                fileInfo.classList.add('hidden');
-            }
-        }
-        
-        // 开始文件处理
-        function startFileProcessing() {
-            if (!selectedFile) return;
-            
-            // 显示进度条
-            recognitionProgress.classList.remove('hidden');
-            updateProgress(10, '正在处理文件...');
-            
-            // 根据文件类型处理
-            const fileExtension = getFileExtension(selectedFile.name);
-            
-            if (['jpg', 'jpeg', 'png'].includes(fileExtension)) {
-                // 处理图片文件
-                processImageFile(selectedFile);
-            } else if (fileExtension === 'pdf') {
-                // 处理PDF文件
-                processPdfFile(selectedFile);
-            } else if (fileExtension === 'docx') {
-                // 处理DOCX文件
-                processDocxFile(selectedFile);
-            } else {
-                alert('不支持的文件格式，请上传PDF、DOCX或图片文件');
-                resetRecognitionState();
-            }
-        }
-        
-        // 处理图片文件
-        function processImageFile(file) {
-            updateProgress(30, '正在准备图片...');
-            
-            // 转换为Base64并调用OCR
-            fileToBase64(file)
-               .then(base64Data => {
-                    updateProgress(50, '正在调用OCR识别...');
-                    return callRoboflowOcrApi(base64Data);
-                })
-               .then(ocrText => {
-                    updateProgress(100, '识别完成');
-                    displayOcrResult(ocrText);
-                })
-               .catch(error => {
-                    console.error('图片处理失败:', error);
-                    alert(`处理失败: ${error.message}`);
-                    resetRecognitionState();
-                });
-        }
-        
-        // 处理PDF文件
-        function processPdfFile(file) {
-            updateProgress(20, '正在加载PDF...');
-            
-            const fileReader = new FileReader();
-            
-            fileReader.onload = function() {
-                const typedArray = new Uint8Array(this.result);
-                
-                // 加载PDF
-                pdfjsLib.getDocument(typedArray).promise
-                   .then(pdf => {
-                        pdfDoc = pdf;
-                        updateProgress(30, `PDF加载完成，共${pdf.numPages}页`);
-                        
-                        // 生成页码选择器
-                        generatePageSelector(pdf.numPages);
-                        
-                        // 显示页码选择器
-                        pdfPageSelector.classList.remove('hidden');
-                        updateProgress(40, '请选择要识别的页面');
-                    })
-                   .catch(error => {
-                        console.error('PDF处理失败:', error);
-                        alert(`PDF处理失败: ${error.message}`);
-                        resetRecognitionState();
-                    });
-            };
-            
-            fileReader.readAsArrayBuffer(file);
-        }
-        
-        // 生成PDF页码选择器
-        function generatePageSelector(totalPages) {
-            pageSelect.innerHTML = '';
-            for (let i = 1; i <= totalPages; i++) {
-                const option = document.createElement('option');
-                option.value = i;
-                option.textContent = `第${i}页`;
-                pageSelect.appendChild(option);
-            }
-            currentPage = 1;
-        }
-        
-        // 确认PDF页码选择
-        function confirmPdfPageSelection() {
-            if (!pdfDoc) return;
-            
-            currentPage = parseInt(pageSelect.value);
-            pdfPageSelector.classList.add('hidden');
-            updateProgress(50, `正在处理第${currentPage}页...`);
-            
-            // 渲染PDF页面为图片
-            pdfDoc.getPage(currentPage)
-               .then(page => {
-                    const viewport = page.getViewport({ scale: 2.0 });
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
-                    
-                    const renderContext = {
-                        canvasContext: context,
-                        viewport: viewport
-                    };
-                    
-                    return page.render(renderContext).promise.then(() => {
-                        // 将canvas转为Base64
-                        return canvas.toDataURL('image/jpeg');
-                    });
-                })
-               .then(base64Data => {
-                    updateProgress(70, '正在调用OCR识别...');
-                    return callRoboflowOcrApi(base64Data);
-                })
-               .then(ocrText => {
-                    updateProgress(100, '识别完成');
-                    displayOcrResult(ocrText);
-                })
-               .catch(error => {
-                    console.error('PDF页面处理失败:', error);
-                    alert(`PDF页面处理失败: ${error.message}`);
-                    resetRecognitionState();
-                });
-        }
-        
-        // 处理DOCX文件
-        function processDocxFile(file) {
-            updateProgress(30, '正在解析DOCX文件...');
-            
-            // 读取DOCX文件
-            const reader = new FileReader();
-            
-            reader.onload = function(e) {
-                try {
-                    const content = e.target.result;
-                    const zip = new PizZip(content);
-                    const doc = new docxtemplater().loadZip(zip);
-                    const text = doc.getFullText();
-                    
-                    updateProgress(100, 'DOCX解析完成');
-                    displayOcrResult(text);
-                } catch (error) {
-                    console.error('DOCX处理失败:', error);
-                    alert(`DOCX处理失败: ${error.message}`);
-                    resetRecognitionState();
-                }
-            };
-            
-            reader.readAsBinaryString(file);
-        }
-        
-        // 调用Roboflow OCR API
-        function callRoboflowOcrApi(base64Image) {
-            return new Promise((resolve, reject) => {
-                // 提取Base64数据部分（去掉前缀）
-                const base64Data = base64Image.split(',')[1];
-                
-                fetch('https://infer.roboflow.com/doctr/ocr', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Token ${ROBOFLOW_API_KEY}`
-                    },
-                    body: JSON.stringify({ image: base64Data })
-                })
-               .then(response => {
-                    if (!response.ok) {
-                        return response.json().then(err => {
-                            throw new Error(err.error || `API请求失败: ${response.status}`);
-                        });
-                    }
-                    return response.json();
-                })
-               .then(result => {
-                    // 提取识别到的文本
-                    let fullText = '';
-                    if (result && result.pages && result.pages.length > 0) {
-                        result.pages[0].blocks.forEach(block => {
-                            block.lines.forEach(line => {
-                                line.words.forEach(word => {
-                                    fullText += word.text +'';
-                                });
-                                fullText += '\n';
-                            });
-                        });
-                    }
-                    
-                    if (!fullText) {
-                        throw new Error('未识别到任何文本，请确保文件内容清晰');
-                    }
-                    
-                    resolve(fullText);
-                })
-               .catch(error => {
-                    reject(error);
-                });
-            });
-        }
-        
-        // 显示OCR识别结果
-        function displayOcrResult(text) {
-            recognizedText.value = text;
-            ocrResult.classList.remove('hidden');
-            
-            // 延迟隐藏进度条，让用户看到完成状态
-            setTimeout(() => {
-                recognitionProgress.classList.add('hidden');
-            }, 1000);
-        }
-        
-        // 解析识别到的文本
-        function parseRecognizedText() {
-            const text = recognizedText.value.trim();
-            if (!text) {
-                alert('没有可解析的文本内容');
-                return;
-            }
-            
-            const courses = parseCourseText(text);
-            displayParsedCourses(courses);
-            parsedCoursesContainer.classList.remove('hidden');
-        }
-        
-        // 解析文本中的课程信息
-        function parseCourseText(text) {
-            // 星期关键词映射
-            const dayKeywords = {
-                '日': '0', '天': '0',
-                '一': '1', '二': '2', '三': '3', '四': '4', '五': '5', '六': '6',
-                '周日': '0', '周一': '1', '周二': '2', '周三': '3', '周四': '4', '周五': '5', '周六': '6'
-            };
-            
-            // 分割文本为行
-            const lines = text.split('\n')
-               .map(line => line.trim())
-               .filter(line => line);
-            
-            const courses = [];
-            
-            // 提取课程信息
-            lines.forEach(line => {
-                // 匹配时间格式 (HH:MM 或 HH-MM)
-                const timeRegex = /(\d{1,2}[:-]\d{2})[^\d]*(\d{1,2}[:-]\d{2})/;
-                // 匹配星期
-                const dayRegex = /(周[日一二三四五六天]|周日|周一|周二|周三|周四|周五|周六)/;
-                
-                const timeMatch = line.match(timeRegex);
-                const dayMatch = line.match(dayRegex);
-                
-                if (timeMatch && dayMatch) {
-                    // 提取时间并标准化为HH:MM格式
-                    let startTime = timeMatch[1].replace('-', ':');
-                    let endTime = timeMatch[2].replace('-', ':');
-                    
-                    // 确保时间格式正确 (补零)
-                    startTime = normalizeTimeFormat(startTime);
-                    endTime = normalizeTimeFormat(endTime);
-                    
-                    // 提取星期
-                    const dayText = dayMatch[0];
-                    const day = dayKeywords[dayText] || '1';
-                    
-                    // 提取学生姓名
-                    let studentName = line.replace(timeRegex, '').replace(dayRegex, '').trim();
-                    studentName = studentName.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g,'').trim();
-                    
-                    if (studentName) {
-                        courses.push({
-                            student: studentName,
-                            day: day,
-                            start: startTime,
-                            end: endTime
-                        });
-                    }
-                }
-            });
-            
-            // 如果没有解析到课程，返回一个空模板
-            if (courses.length === 0) {
-                return [{
-                    student: '',
-                    day: '1',
-                    start: '09:00',
-                    end: '10:30'
-                }];
-            }
-            
-            return courses;
-        }
-        
-        // 显示解析出的课程
-        function displayParsedCourses(results) {
-            parsedCourses.innerHTML = '';
-            const dayMap = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-            
-            results.forEach((course, index) => {
-                const courseEl = document.createElement('div');
-                courseEl.className = 'course-item p-3 border border-gray-200 rounded-md hover:shadow-md transition-shadow';
-                courseEl.innerHTML = `
-                    <div class="flex flex-col md:flex-row gap-4">
-                        <div class="flex-1">
-                            <label class="block text-sm text-gray-600 mb-1">学生姓名</label>
-                            <input type="text" class="student-name w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500" value="${course.student}">
-                        </div>
-                        
-                        <div class="w-24">
-                            <label class="block text-sm text-gray-600 mb-1">星期</label>
-                            <select class="course-day w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500">
-                                ${[0,1,2,3,4,5,6].map(day => `
-                                    <option value="${day}" ${course.day == day? 'selected' : ''}>${dayMap[day]}</option>
-                                `).join('')}
-                            </select>
-                        </div>
-                        
-                        <div class="w-24">
-                            <label class="block text-sm text-gray-600 mb-1">开始时间</label>
-                            <input type="time" class="course-start w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500" value="${course.start}">
-                        </div>
-                        
-                        <div class="w-24">
-                            <label class="block text-sm text-gray-600 mb-1">结束时间</label>
-                            <input type="time" class="course-end w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500" value="${course.end}">
-                        </div>
-                        
-                        <div class="flex items-end">
-                            <button class="remove-course text-red-500 hover:text-red-700 p-2 transition-colors" data-index="${index}">
-                                <i class="fa fa-trash-o"></i>
-                            </button>
-                        </div>
-                    </div>
-                `;
-                parsedCourses.appendChild(courseEl);
-            });
-            
-            // 添加删除事件
-            document.querySelectorAll('.remove-course').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const index = e.currentTarget.getAttribute('data-index');
-                    parsedCourses.children[index].remove();
-                });
-            });
-        }
-        
-        // 保存解析的课程到数据库
-        function saveParsedCoursesToDB() {
-            const courseElements = parsedCourses.querySelectorAll('.course-item');
-            const coursesToSave = [];
-            
-            courseElements.forEach(el => {
-                const student = el.querySelector('.student-name').value.trim();
-                const day = el.querySelector('.course-day').value;
-                const start = el.querySelector('.course-start').value;
-                const end = el.querySelector('.course-end').value;
-                
-                if (student && day && start && end && start < end) {
-                    coursesToSave.push({
-                        student_name: student,
-                        day: day,
-                        start_time: start,
-                        end_time: end
-                    });
-                }
-            });
-            
-            if (coursesToSave.length === 0) {
-                alert('请确认课程信息是否完整');
-                return;
-            }
-            
-            // 显示进度
-            recognitionProgress.classList.remove('hidden');
-            updateProgress(0, '正在保存课程信息...');
-            
-            // 批量保存
-            const total = coursesToSave.length;
-            let completed = 0;
-            
-            const savePromises = coursesToSave.map(course => 
-                fetch(SHEETDB_API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: course })
-                })
-               .then(response => {
-                    if (!response.ok) throw new Error('保存失败');
-                    completed++;
-                    updateProgress(Math.round((completed / total) * 100), `已保存 ${completed}/${total}`);
-                })
-            );
-            
-            Promise.all(savePromises)
-               .then(() => {
-                    setTimeout(() => {
-                        recognitionProgress.classList.add('hidden');
-                        parsedCoursesContainer.classList.add('hidden');
-                        ocrResult.classList.add('hidden');
-                        fileUpload.value = '';
-                        startRecognition.disabled = true;
-                        fileInfo.classList.add('hidden');
-                        
-                        // 刷新课程列表
-                        fetchClasses();
-                        checkCurrentClasses();
-                        updateTodayOverview();
-                        
-                        alert(`成功保存 ${coursesToSave.length} 条课程信息`);
-                    }, 500);
-                })
-               .catch(error => {
-                    console.error('保存课程失败:', error);
-                    alert(`保存失败: ${error.message}`);
-                    recognitionProgress.classList.add('hidden');
-                });
-        }
-        
-        // 手动添加课程
-        function addNewClassManually() {
-            if (!studentName.value.trim()) {
-                alert('请输入学生姓名');
-                return;
-            }
-            
-            if (!classStartTime.value ||!classEndTime.value) {
-                alert('请选择课程开始和结束时间');
-                return;
-            }
-            
-            if (classStartTime.value >= classEndTime.value) {
-                alert('结束时间必须晚于开始时间');
-                return;
-            }
-            
-            const newClass = {
-                student_name: studentName.value.trim(),
-                day: classDay.value,
-                start_time: classStartTime.value,
-                end_time: classEndTime.value
-            };
-            
-            fetch(SHEETDB_API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ data: newClass })
-            })
-           .then(response => {
-                if (!response.ok) throw new Error('添加失败');
-                return response.json();
-            })
-           .then(result => {
-                if (result.created === 1) {
-                    studentName.value = '';
-                    classStartTime.value = '';
-                    classEndTime.value = '';
-                    
-                    // 刷新数据
-                    fetchClasses();
-                    checkCurrentClasses();
-                    updateTodayOverview();
-                    
-                    alert('课程添加成功');
-                } else {
-                    throw new Error('添加失败');
-                }
-            })
-           .catch(error => {
-                console.error('添加课程失败:', error);
-                alert(`添加课程失败: ${error.message}`);
-            });
-        }
-        
-        // 检查SheetDB连接
-        function checkSheetDBConnection() {
-            fetch(SHEETDB_API_URL)
-               .then(response => {
-                    if (response.ok) {
-                        connectionStatus.innerHTML = '<i class="fa fa-check mr-1"></i> 已连接';
-                        connectionStatus.className = 'mt-2 text-sm py-1 px-3 rounded-full inline-block bg-green-100 text-green-800';
-                        fetchClasses();
-                        checkCurrentClasses();
-                        updateTodayOverview();
-                    } else {
-                        throw new Error('连接失败');
-                    }
-                })
-               .catch(error => {
-                    connectionStatus.innerHTML = '<i class="fa fa-exclamation-triangle mr-1"></i> 连接失败';
-                    connectionStatus.className = 'mt-2 text-sm py-1 px-3 rounded-full inline-block bg-red-100 text-red-800';
-                    console.error('SheetDB连接失败:', error);
-                });
-        }
-        
-        // 获取课程列表
-        function fetchClasses() {
-            fetch(SHEETDB_API_URL)
-               .then(response => {
-                    if (!response.ok) throw new Error('获取失败');
-                    return response.json();
-                })
-               .then(classes => {
-                    if (Array.isArray(classes) && classes.length > 0) {
-                        displayClassList(classes);
-                    } else {
-                        classList.innerHTML = '<p class="text-gray-500 italic text-sm">暂无课程数据</p>';
-                    }
-                })
-               .catch(error => {
-                    console.error('加载课程失败:', error);
-                    classList.innerHTML = '<p class="text-red-500 italic text-sm">加载课程失败</p>';
-                });
-        }
-        
-        // 显示课程列表
-        function displayClassList(classes) {
-            const dayMap = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-            let html = '';
-            
-            // 排序课程
-            const sortedClasses = [...classes].sort((a, b) => {
-                if (parseInt(a.day)!== parseInt(b.day)) {
-                    return parseInt(a.day) - parseInt(b.day);
-                }
-                return a.start_time.localeCompare(b.start_time);
-            });
-            
-            sortedClasses.forEach(classItem => {
-                html += `
-                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-md border border-gray-100 hover:shadow-sm transition-shadow">
-                        <div class="flex-1">
-                            <div class="font-medium">${classItem.student_name}</div>
-                            <div class="text-sm text-gray-600">
-                                ${dayMap[parseInt(classItem.day)]} ${classItem.start_time} - ${classItem.end_time}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            classList.innerHTML = html;
-        }
-        
-        // 检查当前时间的课程
-        function checkCurrentClasses() {
-            const targetDate = new Date(selectedDate.value);
-            const targetDay = targetDate.getDay();
-            const targetTime = selectedTime.value;
-            
-            fetch(SHEETDB_API_URL)
-               .then(response => {
-                    if (!response.ok) throw new Error('查询失败');
-                    return response.json();
-                })
-               .then(classes => {
-                    if (Array.isArray(classes) && classes.length > 0) {
-                        const currentClasses = classes.filter(classItem => {
-                            return parseInt(classItem.day) === targetDay && 
-                                   isTimeBetween(targetTime, classItem.start_time, classItem.end_time);
-                        });
-                        
-                        if (currentClasses.length > 0) {
-                            let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
-                            currentClasses.forEach(classItem => {
-                                html += `
-                                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-100 hover:shadow-md transition-shadow">
-                                        <div class="font-medium text-gray-800">${classItem.student_name}</div>
-                                        <div class="text-xs text-gray-500 mt-2">时间: ${classItem.start_time} - ${classItem.end_time}</div>
-                                    </div>
-                                `;
-                            });
-                            html += '</div>';
-                            currentClassContainer.innerHTML = html;
-                        } else {
-                            currentClassContainer.innerHTML = `
-                                <i class="fa fa-check-circle text-5xl text-green-300 mb-3"></i>
-                                <p class="text-gray-500">该时间没有人上课</p>
-                            `;
-                        }
-                    } else {
-                        currentClassContainer.innerHTML = `
-                            <i class="fa fa-info-circle text-5xl text-blue-300 mb-3"></i>
-                            <p class="text-gray-500">暂无课程数据</p>
-                        `;
-                    }
-                })
-               .catch(error => {
-                    console.error('查询课程失败:', error);
-                    currentClassContainer.innerHTML = '<p class="text-red-500">查询失败，请重试</p>';
-                });
-        }
-        
-        // 更新今日课程概览
-        function updateTodayOverview() {
-            const targetDate = new Date(selectedDate.value);
-            const targetDay = targetDate.getDay();
-            
-            fetch(SHEETDB_API_URL)
-               .then(response => {
-                    if (!response.ok) throw new Error('获取失败');
-                    return response.json();
-                })
-               .then(classes => {
-                    if (Array.isArray(classes) && classes.length > 0) {
-                        const dayClasses = classes.filter(classItem => parseInt(classItem.day) === targetDay);
-                        dayClasses.sort((a, b) => a.start_time.localeCompare(b.start_time));
-                        
-                        if (dayClasses.length > 0) {
-                            let html = '';
-                            dayClasses.forEach(classItem => {
-                                html += `
-                                    <div class="flex items-center p-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 rounded transition-colors">
-                                        <div class="w-24 text-sm text-gray-600">${classItem.start_time}</div>
-                                        <div class="flex-1 text-sm font-medium">${classItem.student_name}</div>
-                                    </div>
-                                `;
-                            });
-                            todayOverview.innerHTML = html;
-                        } else {
-                            todayOverview.innerHTML = '<p class="text-gray-500 italic text-sm">当天没有课程安排</p>';
-                        }
-                    } else {
-                        todayOverview.innerHTML = '<p class="text-gray-500 italic text-sm">暂无课程数据</p>';
-                    }
-                })
-               .catch(error => {
-                    console.error('加载课程概览失败:', error);
-                    todayOverview.innerHTML = '<p class="text-red-500 italic text-sm">加载失败</p>';
-                });
-        }
-        
-        // 辅助函数：更新进度
-        function updateProgress(percent, text) {
-            progressBar.style.width = `${percent}%`;
-            progressPercent.textContent = `${percent}%`;
-            progressText.textContent = text;
-        }
-        
-        // 辅助函数：重置识别状态
-        function resetRecognitionState() {
-            recognitionProgress.classList.add('hidden');
-            pdfPageSelector.classList.add('hidden');
-            ocrResult.classList.add('hidden');
-            parsedCoursesContainer.classList.add('hidden');
-            progressBar.style.width = '0%';
-            pdfDoc = null;
-        }
-        
-        // 辅助函数：获取文件扩展名
-        function getFileExtension(filename) {
-            return filename.split('.').pop().toLowerCase();
-        }
-        
-        // 辅助函数：格式化文件大小
-        function formatFileSize(bytes) {
-            if (bytes < 1024) return bytes + 'B';
-            else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + 'KB';
-            else return (bytes / 1048576).toFixed(1) + 'MB';
-        }
-        
-        // 辅助函数：文件转Base64
-        function fileToBase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (e) => resolve(e.target.result);
-                reader.onerror = (e) => reject(e);
-                reader.readAsDataURL(file);
-            });
-        }
-        
-        // 辅助函数：标准化时间格式
-        function normalizeTimeFormat(time) {
-            const parts = time.split(':');
-            if (parts.length!== 2) return time;
-            
-            let [hours, minutes] = parts;
-            hours = hours.padStart(2, '0');
-            minutes = minutes.padStart(2, '0');
-            
-            return `${hours}:${minutes}`;
-        }
-        
-        // 辅助函数：检查时间是否在范围内
-        function isTimeBetween(time, startTime, endTime) {
-            return time >= startTime && time <= endTime;
-        }
-        
-        // 辅助函数：使用当前日期时间
-        function useCurrentDateTime() {
-            const now = new Date();
-            selectedDate.value = now.toISOString().split('T')[0];
-            selectedTime.value = now.toTimeString().split(' ')[0].slice(0, 5);
-            updateViewAndData();
-        }
-        
-        // 辅助函数：更新视图和数据
-        function updateViewAndData() {
-            updateViewTitle();
-            checkCurrentClasses();
-            updateTodayOverview();
-        }
-        
-        // 辅助函数：更新视图标题
-        function updateViewTitle() {
-            const date = new Date(selectedDate.value);
-            const dateStr = date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
-            currentViewTitle.textContent = `${dateStr} ${selectedTime.value} 上课情况`;
-        }
-    </script>
 </body>
 </html>
-    
